@@ -12,4 +12,3 @@ export function writeJson(key, value) {
     localStorage.setItem(key, JSON.stringify(value))
   } catch (_) {}
 }
-

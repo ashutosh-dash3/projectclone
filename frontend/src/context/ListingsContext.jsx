@@ -5,8 +5,8 @@ import apiService from '../services/api'
 const ListingsContext = createContext(null)
 
 const demo = [
-  { id: 'd1', title: 'Student PG near Campus', city: 'Delhi', rent: 6000, beds: 2, baths: 1, size: '700 sqft', ownerId: 'demo', image: 'https://picsum.photos/seed/pg1/800/400' },
-  { id: 'd2', title: 'Shared Room for Students', city: 'Pune', rent: 4500, beds: 1, baths: 1, size: '400 sqft', ownerId: 'demo', image: 'https://picsum.photos/seed/pg2/800/400' },
+  { id: 'd1', title: 'Student PG near Campus', city: 'Delhi', rent: 6000, beds: 2, baths: 1, size: '700 sqft', ownerId: 'demo', image: '/demo_2.jpg' },
+  { id: 'd2', title: 'Shared Room for Students', city: 'Pune', rent: 4500, beds: 1, baths: 1, size: '400 sqft', ownerId: 'demo', image: '/demo_3.jpg' },
 ]
 
 export function ListingsProvider({ children }) {

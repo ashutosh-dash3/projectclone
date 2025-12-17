@@ -215,7 +215,7 @@ const Home = () => {
             ))}
           </div>
           <div className="mt-10 grid gap-6 sm:grid-cols-3">
-            {[{label:'Happy Clients',value:'250K+'},{label:'Properties Sold',value:'15K+'},{label:'In Business',value:'10 Years'}].map((s)=> (
+            {[{label:'Happy Clients',value:'5K+'},{label:'Properties Sold',value:'300+'},{label:'In Business',value:'5 Years'}].map((s)=> (
               <div key={s.label} className="rounded-xl border border-teal-200 bg-teal-50 p-6 text-center dark:border-teal-900 dark:bg-teal-700/10">
                 <div className="text-3xl font-extrabold text-teal-600 dark:text-teal-400">{s.value}</div>
                 <div className="mt-1 text-sm text-neutral-700 dark:text-neutral-300">{s.label}</div>
