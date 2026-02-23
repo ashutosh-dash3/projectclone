@@ -22,8 +22,8 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['student', 'owner'],
-    default: 'student'
+    enum: ['tenant', 'vendor', 'admin'],
+    default: 'tenant'
   },
   phone: {
     type: String,
@@ -44,6 +44,10 @@ const userSchema = new mongoose.Schema({
     },
     location: [String],
     propertyType: [String]
+  },
+  unreadMessagesCount: {
+    type: Number,
+    default: 0
   }
 }, {
   timestamps: true

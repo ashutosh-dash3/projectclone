@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { ShieldCheck, Users, Zap, MessageCircle, Star, BedDouble, Bath, Ruler, Heart } from 'lucide-react'
 import { useListings } from '../context/ListingsContext'
 import apiService from '../services/api'
@@ -63,23 +63,55 @@ const features = [
 
 const Home = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const { wishlist, toggleWishlist, listings, loading } = useListings()
   const [feedbacks, setFeedbacks] = useState([])
+  const [key, setKey] = useState(0)
+
+  // Force re-render when location changes
+  useEffect(() => {
+    setKey(prev => prev + 1);
+  }, [location.pathname])
   
   // Use API listings if available, otherwise fallback to hardcoded features
-  const displayListings = listings.length > 0 ? listings.slice(0, 6) : features
+  // Ensure all listings have proper image URLs
+  const displayListings = listings.length > 0 ? 
+    listings.slice(0, 6).map(listing => ({
+      ...listing,
+      image: listing.images?.[0] || 
+             listing.image || 
+             `https://picsum.photos/seed/${listing._id || listing.id}/800/600`,
+      price: listing.price || listing.rent
+    })) : 
+    features
+
+  // Debug logging
+  useEffect(() => {
+    console.log('Home component - listings:', listings);
+    console.log('Home component - displayListings:', displayListings);
+  }, [listings, displayListings]);
 
   // Load feedbacks from API
   useEffect(() => {
+    let isMounted = true;
+    
     const loadFeedbacks = async () => {
       try {
         const response = await apiService.getPublicFeedbacks(3)
-        setFeedbacks(response.feedbacks || [])
+        if (isMounted) {
+          setFeedbacks(response.feedbacks || [])
+        }
       } catch (error) {
-        console.log('Using default feedbacks')
+        if (isMounted) {
+          console.log('Using default feedbacks')
+        }
       }
     }
     loadFeedbacks()
+    
+    return () => {
+      isMounted = false;
+    };
   }, [])
 
   // Default feedbacks if API is not available
@@ -92,7 +124,7 @@ const Home = () => {
   const displayFeedbacks = feedbacks.length > 0 ? feedbacks : defaultFeedbacks
   
   return (
-    <div className="bg-white text-neutral-900 dark:bg-neutral-900 dark:text-neutral-100">
+    <div key={key} className="bg-white text-neutral-900 dark:bg-neutral-900 dark:text-neutral-100">
       <section className="mx-auto max-w-7xl px-4 pb-16 pt-14">
         <div className="grid items-center gap-10 md:grid-cols-2">
           <div>
@@ -176,7 +208,7 @@ const Home = () => {
           <h2 className="text-center text-2xl font-extrabold tracking-tight">What Our Clients Say</h2>
           <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {displayFeedbacks.map((feedback, i) => (
-              <div key={i} className="rounded-xl border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-900">
+              <div key={`feedback-${i}`} className="rounded-xl border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-900">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 shrink-0 rounded-full bg-neutral-200 dark:bg-neutral-800" />
                   <div className="text-sm">

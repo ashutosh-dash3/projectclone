@@ -1,8 +1,16 @@
 const Listing = require('../models/Listing');
 const Wishlist = require('../models/Wishlist');
+const {
+  getAllListings,
+  getListingById,
+  createListing: createListingService,
+  updateListing: updateListingService,
+  deleteListing: deleteListingService,
+  toggleListingAvailability
+} = require('../services/listingService');
 
 // Get all listings with filters
-const getListings = async (req, res) => {
+const getListings = async (req, res, next) => {
   try {
     const {
       page = 1,
@@ -18,46 +26,24 @@ const getListings = async (req, res) => {
       owner
     } = req.query;
 
-    // Build filter object
-    const filter = { isAvailable: true };
+    // Build filters dynamically - only include non-empty values
+    const filters = { page, limit };
+    
+    if (city && city.trim() !== '') filters.city = city.trim();
+    if (minPrice && minPrice.trim() !== '') filters.minPrice = parseInt(minPrice);
+    if (maxPrice && maxPrice.trim() !== '') filters.maxPrice = parseInt(maxPrice);
+    if (propertyType && propertyType.trim() !== '') filters.propertyType = propertyType.trim();
+    if (bedrooms && bedrooms.trim() !== '') filters.bedrooms = parseInt(bedrooms);
+    if (bathrooms && bathrooms.trim() !== '') filters.bathrooms = parseInt(bathrooms);
+    if (search && search.trim() !== '') filters.search = search.trim();
+    if (featured && featured.trim() !== '') filters.featured = featured.trim();
+    if (owner && owner.trim() !== '') filters.owner = owner.trim();
 
-    if (city) filter.city = new RegExp(city, 'i');
-    if (propertyType) filter.propertyType = propertyType;
-    if (bedrooms) filter.bedrooms = parseInt(bedrooms);
-    if (bathrooms) filter.bathrooms = parseInt(bathrooms);
-    if (featured === 'true') filter.isFeatured = true;
-    if (owner) filter.owner = owner;
+    const options = { sort: { createdAt: -1 } };
 
-    // Price range filter
-    if (minPrice || maxPrice) {
-      filter.price = {};
-      if (minPrice) filter.price.$gte = parseInt(minPrice);
-      if (maxPrice) filter.price.$lte = parseInt(maxPrice);
-    }
+    const result = await getAllListings(filters, options);
 
-    // Text search
-    if (search) {
-      filter.$text = { $search: search };
-    }
-
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    const listings = await Listing.find(filter)
-      .populate('owner', 'name email phone')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const total = await Listing.countDocuments(filter);
-
-    res.json({
-      listings,
-      pagination: {
-        current: parseInt(page),
-        pages: Math.ceil(total / parseInt(limit)),
-        total
-      }
-    });
+    res.status(200).json(result);
   } catch (error) {
     console.error('Get listings error:', error);
     res.status(500).json({ message: 'Server error while fetching listings' });
@@ -65,95 +51,164 @@ const getListings = async (req, res) => {
 };
 
 // Get single listing
-const getListing = async (req, res) => {
+const getListing = async (req, res, next) => {
   try {
-    const listing = await Listing.findById(req.params.id)
-      .populate('owner', 'name email phone');
-
-    if (!listing) {
-      return res.status(404).json({ message: 'Listing not found' });
-    }
-
+    const listing = await getListingById(req.params.id);
     res.json(listing);
   } catch (error) {
-    console.error('Get listing error:', error);
-    res.status(500).json({ message: 'Server error while fetching listing' });
+    next(error);
   }
 };
 
 // Create new listing
-const createListing = async (req, res) => {
+const createListing = async (req, res, next) => {
   try {
+    // Handle file uploads
+    const images = [];
+    if (req.files && req.files.length > 0) {
+      // In production, you would upload to cloud storage
+      // For now, we'll store the filenames
+      req.files.forEach(file => {
+        images.push(`/uploads/${file.filename}`);
+      });
+    }
+    
+    // Parse form data - handle both JSON body and FormData
+    let bodyData = req.body;
+    
+    // If data is sent as JSON string in FormData
+    if (req.body.data) {
+      try {
+        bodyData = JSON.parse(req.body.data);
+      } catch (e) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid JSON data'
+        });
+      }
+    }
+    
+    // Convert form data to proper types
     const listingData = {
-      ...req.body,
+      title: bodyData.title,
+      description: bodyData.description,
+      price: Number(bodyData.price),
+      city: bodyData.city,
+      address: bodyData.address,
+      propertyType: bodyData.propertyType,
+      bedrooms: bodyData.bedrooms ? Number(bodyData.bedrooms) : undefined,
+      bathrooms: bodyData.bathrooms ? Number(bodyData.bathrooms) : undefined,
+      size: bodyData.size || undefined,
+      amenities: Array.isArray(bodyData.amenities) ? bodyData.amenities : (bodyData.amenities ? [bodyData.amenities] : []),
+      images: images,
       owner: req.user._id
     };
-
-    const listing = new Listing(listingData);
-    await listing.save();
-
-    await listing.populate('owner', 'name email phone');
-
+    
+    // Add property type specific fields
+    if (bodyData.propertyType === 'pg') {
+      listingData.pgFood = bodyData.pgFood || 'no';
+      listingData.pgWifi = bodyData.pgWifi || 'no';
+      listingData.pgCharges = bodyData.pgCharges ? Number(bodyData.pgCharges) : 0;
+    } else if (bodyData.propertyType === 'room') {
+      listingData.roomOwnBed = bodyData.roomOwnBed || 'yes';
+    } else if (bodyData.propertyType === 'flat' || bodyData.propertyType === 'apartment') {
+      listingData.flatBhk = bodyData.flatBhk ? Number(bodyData.flatBhk) : 1;
+      listingData.flatFacilities = bodyData.flatFacilities || '';
+    }
+    
+    // Validate required fields
+    if (!listingData.title || listingData.title.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Title is required'
+      });
+    }
+    
+    if (!listingData.price || listingData.price <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid price is required'
+      });
+    }
+    
+    if (!listingData.city || listingData.city.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'City is required'
+      });
+    }
+    
+    if (!listingData.address || listingData.address.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Address is required'
+      });
+    }
+    
+    if (!listingData.description || listingData.description.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Description is required'
+      });
+    }
+    
+    // Validate PG charges if property type is PG
+    if (bodyData.propertyType === 'pg' && (!bodyData.pgCharges || Number(bodyData.pgCharges) <= 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'PG charges are required for PG properties'
+      });
+    }
+    
+    // Validate images
+    if (!images || images.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one photo is required'
+      });
+    }
+    
+    if (images.length > 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Maximum 5 photos allowed'
+      });
+    }
+    
+    const listing = await createListingService(listingData, req.user._id);
+    
     res.status(201).json({
+      success: true,
       message: 'Listing created successfully',
       listing
     });
   } catch (error) {
     console.error('Create listing error:', error);
-    res.status(500).json({ message: 'Server error while creating listing' });
+    next(error);
   }
 };
 
 // Update listing
-const updateListing = async (req, res) => {
+const updateListing = async (req, res, next) => {
   try {
-    const listing = await Listing.findById(req.params.id);
-
-    if (!listing) {
-      return res.status(404).json({ message: 'Listing not found' });
-    }
-
-    // Check if user owns the listing
-    if (listing.owner.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'Not authorized to update this listing' });
-    }
-
-    const updatedListing = await Listing.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    ).populate('owner', 'name email phone');
+    const updatedListing = await updateListingService(req.params.id, req.body, req.user._id);
 
     res.json({
       message: 'Listing updated successfully',
       listing: updatedListing
     });
   } catch (error) {
-    console.error('Update listing error:', error);
-    res.status(500).json({ message: 'Server error while updating listing' });
+    next(error);
   }
 };
 
 // Delete listing
-const deleteListing = async (req, res) => {
+const deleteListing = async (req, res, next) => {
   try {
-    const listing = await Listing.findById(req.params.id);
-
-    if (!listing) {
-      return res.status(404).json({ message: 'Listing not found' });
-    }
-
-    // Check if user owns the listing
-    if (listing.owner.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'Not authorized to delete this listing' });
-    }
-
-    await Listing.findByIdAndDelete(req.params.id);
-
-    res.json({ message: 'Listing deleted successfully' });
+    const result = await deleteListingService(req.params.id, req.user._id);
+    res.json(result);
   } catch (error) {
-    console.error('Delete listing error:', error);
-    res.status(500).json({ message: 'Server error while deleting listing' });
+    next(error);
   }
 };
 

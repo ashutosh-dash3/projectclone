@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import GoogleSignIn from '../components/auth/GoogleSignIn'
 
 const Login = () => {
   const { login, users } = useAuth()
@@ -20,7 +21,7 @@ const Login = () => {
         setError('Invalid email or password')
         return
       }
-      navigate(user?.role === 'owner' ? '/add' : '/listings')
+      navigate('/listings')
     } catch (err) {
       setError(err.message || 'Login failed')
     }
@@ -40,7 +41,7 @@ const Login = () => {
           <label className="text-sm">Password</label>
           <div className="mt-1 relative">
             <input 
-              value={form.password} 
+              value={form.password}
               onChange={e=>setForm({...form,password:e.target.value})} 
               type={showPassword ? 'text' : 'password'} 
               className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 pr-10 text-sm outline-none dark:border-neutral-700 dark:bg-neutral-900" 
@@ -52,6 +53,30 @@ const Login = () => {
         </div>
         <button type="submit" className="w-full rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-500">Login</button>
       </form>
+      
+      {/* Divider */}
+      <div className="mt-6">
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-300 dark:border-gray-700"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-white dark:bg-neutral-900 text-gray-500 dark:text-gray-400">Or continue with</span>
+          </div>
+        </div>
+      </div>
+      
+      {/* Google Sign In */}
+      <div className="mt-6">
+        <GoogleSignIn 
+          onLoginSuccess={(response) => {
+            navigate('/listings');
+          }}
+          onLoginError={(error) => {
+            setError('Google login failed. Please try again.');
+          }}
+        />
+      </div>
       
       {/* Sign Up Link */}
       <div className="mt-6 text-center">

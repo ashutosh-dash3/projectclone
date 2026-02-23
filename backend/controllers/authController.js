@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { createUser, getUserByEmail, updateUserProfile } = require('../services/userService');
 
 const generateToken = (userId) => {
   return jwt.sign({ userId }, process.env.JWT_SECRET || 'fallback_secret_key', {
@@ -8,26 +9,18 @@ const generateToken = (userId) => {
 };
 
 // Register user
-const register = async (req, res) => {
+const register = async (req, res, next) => {
   try {
     const { name, email, password, role, phone } = req.body;
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: 'User already exists with this email' });
-    }
-
-    // Create new user
-    const user = new User({
+    // Create user using service
+    const user = await createUser({
       name,
       email,
       password,
-      role: role || 'student',
+      role: role || 'tenant',
       phone
     });
-
-    await user.save();
 
     // Generate token
     const token = generateToken(user._id);
@@ -44,26 +37,30 @@ const register = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({ message: 'Server error during registration' });
+    next(error);
   }
 };
 
 // Login user
-const login = async (req, res) => {
+const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    // Find user by email
+    // Check if user exists
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // Check if password exists
+    if (!user.password) {
+      return res.status(500).json({ message: 'Server error' });
     }
 
     // Check password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     // Generate token
@@ -82,7 +79,7 @@ const login = async (req, res) => {
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ message: 'Server error during login' });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -106,7 +103,7 @@ const getCurrentUser = async (req, res) => {
 };
 
 // Update user profile
-const updateProfile = async (req, res) => {
+const updateProfile = async (req, res, next) => {
   try {
     const { name, phone, preferences } = req.body;
     const userId = req.user._id;
@@ -116,19 +113,14 @@ const updateProfile = async (req, res) => {
     if (phone) updateData.phone = phone;
     if (preferences) updateData.preferences = preferences;
 
-    const user = await User.findByIdAndUpdate(
-      userId,
-      updateData,
-      { new: true, runValidators: true }
-    ).select('-password');
+    const user = await updateUserProfile(userId, updateData);
 
     res.json({
       message: 'Profile updated successfully',
       user
     });
   } catch (error) {
-    console.error('Update profile error:', error);
-    res.status(500).json({ message: 'Server error during profile update' });
+    next(error);
   }
 };
 

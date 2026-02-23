@@ -1,5 +1,5 @@
-﻿import React, { useState } from 'react'
-import { NavLink, Link } from 'react-router-dom'
+﻿import React, { useState, useEffect } from 'react'
+import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom'
 import { Moon, Sun, LogOut, User, Menu, X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../hooks/useTheme'
@@ -8,6 +8,48 @@ const NavBar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const { currentUser, logout } = useAuth()
   const { isDark, isLoaded, toggleTheme } = useTheme()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [navKey, setNavKey] = useState(0)
+
+  // Force re-render when location changes
+  useEffect(() => {
+    setNavKey(prev => prev + 1);
+  }, [location.pathname]);
+
+  const handleNavigation = (path) => {
+    console.log('Navigating to:', path);
+    
+    // Try React Router navigation first
+    navigate(path);
+    
+    // Force a re-render by triggering a state update
+    setIsMobileMenuOpen(false);
+    
+    // If navigation doesn't work after a short delay, force a page refresh
+    setTimeout(() => {
+      if (window.location.pathname !== path) {
+        console.log('Forcing navigation with window.location');
+        window.location.href = path;
+      }
+    }, 100);
+  }
+
+  // Helper function to check if a nav item is active
+  const isNavItemActive = (itemPath) => {
+    const currentPath = window.location.pathname;
+    
+    // Handle root path specially
+    if (itemPath === '/') {
+      return currentPath === '/';
+    }
+    
+    // For other paths, check if current path starts with the item path
+    // This handles cases like '/listings' matching '/listings/123'
+    return currentPath === itemPath || 
+           (itemPath !== '/' && currentPath.startsWith(itemPath + '/')) ||
+           (itemPath !== '/' && currentPath.startsWith(itemPath));
+  }
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen)
@@ -46,22 +88,22 @@ const NavBar = () => {
   }
 
   return (
-    <header className="sticky top-0 z-50 bg-teal-50 text-teal-900 shadow-sm border-b border-teal-200 dark:bg-teal-800 dark:text-white dark:border-transparent">
+    <header key={navKey} className="sticky top-0 z-50 bg-teal-50 text-teal-900 shadow-sm border-b border-teal-200 dark:bg-teal-800 dark:text-white dark:border-transparent">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
         <Link to="/" className="font-extrabold text-2xl tracking-tight">FlatBuddy</Link>
         
         {/* Desktop Navigation */}
         <nav className="hidden md:flex gap-6">
           {getNavItems().map((item) => (
-            <NavLink
+            <button
               key={item.label}
-              to={item.to}
-              className={({isActive}) => isActive
-                ? 'text-sm/6 font-medium text-teal-700 dark:text-teal-200'
-                : 'text-sm/6 text-teal-700/80 hover:text-teal-900 transition dark:text-white/80 dark:hover:text-white'}
+              onClick={() => handleNavigation(item.to)}
+              className={`text-sm/6 transition ${isNavItemActive(item.to)
+                ? 'font-medium text-teal-700 dark:text-teal-200'
+                : 'text-teal-700/80 hover:text-teal-900 dark:text-white/80 dark:hover:text-white'}`}
             >
               {item.label}
-            </NavLink>
+            </button>
           ))}
         </nav>
         
@@ -124,20 +166,15 @@ const NavBar = () => {
         <div className="md:hidden border-t border-teal-200 dark:border-white/20 px-4 py-3">
           <nav className="flex flex-col gap-2">
             {getNavItems().map((item) => (
-              <NavLink
+              <button
                 key={item.label}
-                to={item.to}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className={({ isActive }) => 
-                  `text-sm transition px-3 py-2 rounded-md ${
-                    isActive
-                      ? 'font-medium text-teal-800 bg-teal-100 dark:text-teal-200 dark:bg-white/10'
-                      : 'text-teal-700/80 hover:text-teal-900 dark:text-white/80 dark:hover:text-white'
-                  }`
-                }
+                onClick={() => handleNavigation(item.to)}
+                className={`text-sm transition px-3 py-2 rounded-md text-left ${isNavItemActive(item.to)
+                  ? 'font-medium text-teal-800 bg-teal-100 dark:text-teal-200 dark:bg-white/10'
+                  : 'text-teal-700/80 hover:text-teal-900 dark:text-white/80 dark:hover:text-white'}`}
               >
                 {item.label}
-              </NavLink>
+              </button>
             ))}
           </nav>
           

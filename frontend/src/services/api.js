@@ -12,12 +12,20 @@ class ApiService {
     };
 
     if (includeAuth) {
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+      console.log('Token found in localStorage:', token ? 'Yes' : 'No');
+      console.log('Raw token value:', token);
       if (token) {
         headers.Authorization = `Bearer ${token}`;
+        console.log('Authorization header set to:', headers.Authorization);
+      } else {
+        console.log('No token available for Authorization header');
       }
+    } else {
+      console.log('Auth disabled for this request');
     }
 
+    console.log('Final headers:', headers);
     return headers;
   }
 
@@ -29,6 +37,10 @@ class ApiService {
       ...options,
     };
 
+    console.log('Making request to:', url);
+    console.log('Request config:', config);
+    console.log('Request headers:', config.headers);
+
     try {
       const response = await fetch(url, config);
       let data;
@@ -39,8 +51,22 @@ class ApiService {
       }
 
       if (!response.ok) {
-        const message = (data && (data.error || data.message)) || `${response.status} ${response.statusText}`;
-        throw new Error(message || 'Request failed');
+        // Extract error message properly
+        let errorMessage = 'Request failed';
+        if (data) {
+          if (typeof data === 'string') {
+            errorMessage = data;
+          } else if (data.message) {
+            errorMessage = data.message;
+          } else if (data.error) {
+            errorMessage = data.error;
+          } else {
+            errorMessage = JSON.stringify(data);
+          }
+        } else {
+          errorMessage = `${response.status} ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
       }
 
       return data ?? {};
@@ -140,17 +166,58 @@ class ApiService {
     return this.request(`/feedback/public?limit=${limit}`, { includeAuth: false });
   }
 
+  // HTTP methods
+  async get(endpoint, options = {}) {
+    return this.request(endpoint, { method: 'GET', ...options });
+  }
+
+  async post(endpoint, data, options = {}) {
+    return this.request(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      ...options
+    });
+  }
+
+  async put(endpoint, data, options = {}) {
+    return this.request(endpoint, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      ...options
+    });
+  }
+
+  async delete(endpoint, data = null, options = {}) {
+    const config = { method: 'DELETE', includeAuth: true, ...options };
+    if (data) {
+      config.body = JSON.stringify(data);
+      // Ensure Content-Type is set for DELETE requests with body
+      if (!config.headers) {
+        config.headers = {};
+      }
+      config.headers['Content-Type'] = 'application/json';
+    }
+    return this.request(endpoint, config);
+  }
+
   // Utility methods
   setAuthToken(token) {
+    console.log('Setting auth token:', token ? 'setting' : 'clearing');
     if (token) {
       localStorage.setItem('auth_token', token);
+      console.log('Token stored in localStorage:', localStorage.getItem('auth_token'));
     } else {
       localStorage.removeItem('auth_token');
+      console.log('Token cleared from localStorage');
     }
   }
 
   getAuthToken() {
-    return localStorage.getItem('auth_token');
+    const token = localStorage.getItem('auth_token');
+    console.log('getAuthToken called, token:', token ? 'found' : 'not found');
+    console.log('Token length:', token ? token.length : 'N/A');
+    console.log('Token starts with:', token ? token.substring(0, 20) + '...' : 'N/A');
+    return token;
   }
 
   clearAuth() {

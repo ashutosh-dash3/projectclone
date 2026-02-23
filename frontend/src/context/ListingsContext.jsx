@@ -20,21 +20,56 @@ export function ListingsProvider({ children }) {
 
   // Load listings from API on component mount
   useEffect(() => {
-    loadListings()
+    let isMounted = true;
+    
+    const loadInitialListings = async () => {
+      try {
+        const response = await apiService.getListings({});
+        if (isMounted) {
+          setListings(response.listings || []);
+          setLoading(false);
+        }
+      } catch (apiError) {
+        console.log('API not available, using local data:', apiError.message);
+        setError('Using offline data');
+        setTimeout(() => {
+          if (isMounted) setLoading(false);
+        }, 1000);
+      }
+    };
+    
+    loadInitialListings();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [])
 
   const loadListings = async (params = {}) => {
+    let isMounted = true;
     setLoading(true)
     setError(null)
     try {
       const response = await apiService.getListings(params)
-      setListings(response.listings || [])
+      if (isMounted) {
+        setListings(response.listings || [])
+      }
     } catch (apiError) {
-      console.log('API not available, using local data')
+      console.log('API not available, using local data:', apiError.message)
       setError('Using offline data')
+      // Don't set loading to false here to prevent infinite loops
+      setTimeout(() => {
+        if (isMounted) setLoading(false)
+      }, 1000)
     } finally {
-      setLoading(false)
+      // Only set loading to false if we haven't already done so in the catch block
+      if (!error && isMounted) {
+        setLoading(false)
+      }
     }
+    return () => {
+      isMounted = false;
+    };
   }
 
   const addListing = async (payload) => {

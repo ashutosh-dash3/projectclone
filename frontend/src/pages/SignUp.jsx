@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import GoogleSignIn from '../components/auth/GoogleSignIn'
 
 const SignUp = () => {
   const { register } = useAuth()
@@ -17,9 +18,10 @@ const SignUp = () => {
     mobile: '',
     password: '', 
     confirmPassword: '',
-    role: 'student' 
+    profileImage: ''
   })
   const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const nameRegex = /^[A-Za-z\s]+$/
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -105,10 +107,10 @@ const SignUp = () => {
         email: form.email,
         mobile: form.mobile,
         password: form.password,
-        role: form.role,
+        profileImage: form.profileImage || ''
       }
       register(payload)
-      navigate(form.role === 'owner' ? '/add' : '/listings')
+      navigate('/listings')
     } catch (err) {
       setError(err.message || 'Registration failed')
     }
@@ -200,32 +202,75 @@ const SignUp = () => {
         </div>
         <div>
           <label className="text-sm">Confirm password *</label>
-          <input 
-            type="password" 
-            value={form.confirmPassword} 
-            onChange={e => handleFieldChange('confirmPassword', e.target.value)} 
-            className={`mt-1 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-teal-500 dark:bg-neutral-900 ${
-              fieldErrors.confirmPassword ? 'border-red-500 bg-red-50 dark:border-red-500 dark:bg-red-900/30' : 'border-neutral-300 bg-white dark:border-neutral-700'
-            }`} 
-          />
+          <div className="relative">
+            <input 
+              type={showConfirmPassword ? 'text' : 'password'}
+              value={form.confirmPassword} 
+              onChange={e => handleFieldChange('confirmPassword', e.target.value)} 
+              className={`mt-1 w-full rounded-md border px-3 py-2 pr-10 text-sm outline-none focus:ring-2 focus:ring-teal-500 dark:bg-neutral-900 ${
+                fieldErrors.confirmPassword ? 'border-red-500 bg-red-50 dark:border-red-500 dark:bg-red-900/30' : 'border-neutral-300 bg-white dark:border-neutral-700'
+              }`} 
+            />
+            <button type="button" onClick={()=>setShowConfirmPassword(s=>!s)} className="absolute inset-y-0 right-0 grid place-items-center px-2 text-neutral-500 hover:text-neutral-700">
+              {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
           {fieldErrors.confirmPassword && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.confirmPassword}</p>}
         </div>
+        
+        {/* Profile Picture */}
         <div>
-          <label className="text-sm">Role *</label>
-          <select 
-            value={form.role} 
-            onChange={e => handleFieldChange('role', e.target.value)} 
-            className={`mt-1 w-full rounded-md border px-3 py-2 text-sm outline-none dark:bg-neutral-900 ${
-              fieldErrors.role ? 'border-red-500 bg-red-50 dark:border-red-500 dark:bg-red-900/30' : 'border-neutral-300 bg-white dark:border-neutral-700'
-            }`}
-          >
-            <option value="student">Student</option>
-            <option value="owner">Owner</option>
-          </select>
-          {fieldErrors.role && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.role}</p>}
+          <label className="text-sm">Profile Picture (Optional)</label>
+          <input 
+            type="file" 
+            accept="image/*" 
+            onChange={(e) => {
+              const file = e.target.files[0];
+              if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                  handleFieldChange('profileImage', event.target.result);
+                };
+                reader.readAsDataURL(file);
+              }
+            }}
+            className="mt-1 block w-full text-sm file:mr-4 file:rounded-md file:border-0 file:bg-teal-600 file:px-4 file:py-2 file:text-white hover:file:bg-teal-500"
+          />
+          {form.profileImage && (
+            <img 
+              src={form.profileImage} 
+              alt="Profile preview" 
+              className="mt-2 h-20 w-20 rounded-full object-cover border-2 border-teal-500"
+            />
+          )}
         </div>
+
         <button type="submit" className="w-full rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-500">Sign Up</button>
       </form>
+      
+      {/* Divider */}
+      <div className="mt-6">
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-300 dark:border-gray-700"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-white dark:bg-neutral-900 text-gray-500 dark:text-gray-400">Or continue with</span>
+          </div>
+        </div>
+      </div>
+      
+      {/* Google Sign In */}
+      <div className="mt-6">
+        <GoogleSignIn 
+          onLoginSuccess={(response) => {
+            navigate('/listings');
+          }}
+          onLoginError={(error) => {
+            setError('Google signup failed. Please try again.');
+          }}
+        />
+      </div>
       
       {/* Login Link */}
       <div className="mt-6 text-center">
